@@ -1,22 +1,23 @@
-# LLM-Powered Prompt Router
+# LLM Intent-Based Prompt Routing Service
 
-A Python FastAPI service that uses a two-step LLM flow:
-1. Classify user intent (`code`, `data`, `writing`, `career`, `unclear`)
-2. Route to a specialized expert persona prompt to generate a response
+A Python-based FastAPI application that leverages a two-stage LLM workflow to intelligently classify and route user requests.
 
-It includes safe JSON parsing, confidence threshold fallback, manual intent override, and JSONL route logging.
+The system first identifies the user's intent (e.g., code, data, writing, career, or unclear) and then forwards the request to a dedicated expert persona prompt to generate a specialized response.
 
-## Features
+The application includes structured JSON parsing, fallback handling for uncertain classifications, manual intent overrides, confidence-based routing, and request observability through JSONL logging.
 
-- Distinct expert prompts stored in `app/prompts.py`
-- `classify_intent(message)` with structured JSON output parsing
-- `route_and_respond(message, intent)` with specialized persona routing
-- Mandatory `unclear` intent clarification question behavior
-- `route_log.jsonl` append-only observability log
-- Malformed classifier output handling with safe fallback
-- Optional confidence threshold and manual `@intent` override
-- Unit tests covering core requirements
-- Dockerized deployment using `Dockerfile` and `docker-compose.yml`
+## Key Features
+
+* Modular expert prompts maintained in `app/prompts.py`
+* Intelligent `classify_intent(message)` function with structured JSON response parsing
+* Context-aware `route_and_respond(message, intent)` for expert persona routing
+* Automatic clarification questions for ambiguous or unclear user inputs
+* Persistent append-only request logging using `route_log.jsonl`
+* Robust malformed JSON handling with safe fallback behavior
+* Confidence threshold support to reduce incorrect routing
+* Manual routing override using `@intent` prefixes
+* Comprehensive unit tests covering core functionalities
+* Containerized deployment using Docker and Docker Compose
 
 ## Project Structure
 
@@ -40,37 +41,62 @@ It includes safe JSON parsing, confidence threshold fallback, manual intent over
 └── route_log.jsonl
 ```
 
-## Setup (Local)
+## Local Setup
 
-1. Create and activate a virtual environment.
-2. Install dependencies.
-3. Copy `.env.example` to `.env` and set `OPENAI_API_KEY`.
-4. Run the API.
+### 1. Create and activate a virtual environment
 
-```powershell
+```bash
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
+```
+
+### 2. Install dependencies
+
+```bash
 pip install -r requirements.txt
+```
+
+### 3. Configure environment variables
+
+Copy `.env.example` to `.env` and add your API key:
+
+```bash
 Copy-Item .env.example .env
+```
+
+Set:
+
+```env
+OPENAI_API_KEY=your_api_key_here
+```
+
+### 4. Start the application
+
+```bash
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-If you do not have a live API key yet, set `ROUTER_DEMO_MODE=true` in `.env`. The app will use a deterministic local demo client so you can still see classified intents, routed responses, CLI output, API output, and JSONL logs.
+If a live API key is unavailable, enable demo mode:
 
-## API Usage
-
-### Health
-
-```http
-GET /health
+```env
+ROUTER_DEMO_MODE=true
 ```
 
-### Route
+This enables a deterministic local demo client to simulate intent classification, response routing, CLI interactions, API responses, and JSONL logs without requiring external API access.
 
-```http
-POST /route
-Content-Type: application/json
+## API Endpoints
 
+### Health Check
+
+**GET** `/health`
+
+### Route Request
+
+**POST** `/route`
+
+Request body:
+
+```json
 {
   "message": "how do i sort a list of objects in python?"
 }
@@ -86,77 +112,102 @@ Example response:
 }
 ```
 
-## Docker
+## Docker Deployment
 
-Build and run with Docker Compose:
+Build and start the application using Docker Compose:
 
-```powershell
+```bash
 docker-compose up --build
 ```
 
-Service is available at `http://localhost:8000`.
+The service will be accessible at:
 
-## CLI (Optional)
-
-You can run a simple interactive router UI in the terminal:
-
-```powershell
-C:/Users/SRI/AppData/Local/Python/pythoncore-3.14-64/python.exe -m app.cli
+```text
+http://localhost:8000
 ```
 
-Single message mode:
+## CLI Support (Optional)
 
-```powershell
-C:/Users/SRI/AppData/Local/Python/pythoncore-3.14-64/python.exe -m app.cli --message "@code fxi thsi bug pls: for i in range(10) print(i)"
+Launch the interactive CLI interface:
+
+```bash
+python -m app.cli
 ```
 
-If `ROUTER_DEMO_MODE=true`, the CLI works without a real OpenAI key.
+Run a single message directly:
+
+```bash
+python -m app.cli --message "@code fix this bug: for i in range(10) print(i)"
+```
+
+When `ROUTER_DEMO_MODE=true`, the CLI works without an active API key.
 
 ## Core Functions
 
-- `app/router.py:classify_intent(message, llm_client=None, confidence_threshold=0.7)`
-  - Calls LLM with a strict classifier prompt.
-  - Parses JSON output into `{"intent": "string", "confidence": float}`.
-  - Handles malformed output gracefully by returning `{"intent": "unclear", "confidence": 0.0}`.
+### `classify_intent(message, llm_client=None, confidence_threshold=0.7)`
 
-- `app/router.py:route_and_respond(message, intent, llm_client=None)`
-  - Routes to matching expert prompt.
-  - If intent is `unclear`, returns a clarification question.
+* Sends requests to an LLM using a strict intent-classification prompt
+* Parses structured JSON responses:
 
-- `app/router.py:handle_message(...)`
-  - Orchestrates classify -> route -> log.
+```json
+{
+  "intent": "string",
+  "confidence": 0.0
+}
+```
+
+* Gracefully handles malformed outputs by returning:
+
+```json
+{
+  "intent": "unclear",
+  "confidence": 0.0
+}
+```
+
+### `route_and_respond(message, intent, llm_client=None)`
+
+* Routes requests to the corresponding expert persona
+* Returns clarification prompts when the detected intent is unclear
+
+### `handle_message(...)`
+
+* Manages the complete workflow:
+
+  * Intent classification
+  * Response routing
+  * Request logging
 
 ## Logging
 
-Every request appends one JSON object line to `route_log.jsonl` including:
+Each request appends a structured JSON record to `route_log.jsonl`, including:
 
-- `intent`
-- `confidence`
-- `user_message`
-- `final_response`
-
-A `timestamp` field is also included.
+* `intent`
+* `confidence`
+* `user_message`
+* `final_response`
+* `timestamp`
 
 ## Testing
 
-Run all tests:
+Run all test cases:
 
-```powershell
+```bash
 pytest -q
 ```
 
-Tests verify:
+The test suite validates:
 
-- Classifier JSON parsing
-- Malformed JSON fallback
-- Confidence threshold behavior
-- `unclear` clarification response
-- JSONL logging schema
-- Provided set of 15 sample messages handling
+* Structured classifier JSON parsing
+* Malformed JSON fallback behavior
+* Confidence threshold routing
+* Unclear intent clarification handling
+* JSONL log schema validation
+* Handling of 15 predefined sample messages
 
-## Design Notes
+## Architecture Overview
 
-- Classifier prompt is short and constrained for low-cost intent detection.
-- Persona prompts are concise and specialized for higher quality generation.
-- Manual override allows direct routing with prefixes, e.g. `@code fix this bug`.
-- Confidence threshold prevents overconfident misrouting on ambiguous inputs.
+* A lightweight classifier prompt minimizes cost during intent detection
+* Expert persona prompts improve response quality through domain specialization
+* Manual override support enables direct routing using prefixes such as `@code`
+* Confidence thresholds help reduce misclassification for ambiguous queries
