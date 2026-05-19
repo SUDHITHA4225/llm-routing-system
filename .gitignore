@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+.pytest_cache/
+.venv/
+
+# Env files
+.env
+
+# VS Code workspace settings
+.vscode/
+
+# Logs
+*.log
